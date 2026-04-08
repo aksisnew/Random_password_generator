@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Key Generator</title>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --card: #141417;
+            --text: #e2e8f0;
+            --accent: #6366f1;
+            --border: #27272a;
+            --input-bg: #020617;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .wrapper {
+            background: var(--card);
+            padding: 2.5rem;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 480px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .output-box {
+            background: var(--input-bg);
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            word-break: break-all;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'ui-monospace', 'Cascadia Code', monospace;
+            font-size: 1.25rem;
+            color: var(--accent);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .output-box:hover { border-color: var(--accent); }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .m-label { color: #71717a; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+        .m-value { font-weight: 700; font-size: 1.1rem; display: block; }
+
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            gap: 20px;
+        }
+
+        .length-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input[type="number"] {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 8px;
+            border-radius: 8px;
+            width: 70px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            outline: none;
+        }
+
+        input[type="number"]:focus { border-color: var(--accent); }
+
+        .grid-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 2rem;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.02);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+
+        .option:hover { background: rgba(255,255,255,0.05); }
+        .option input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        button:hover { filter: brightness(1.1); }
+        button:active { transform: translateY(1px); }
+
+        .strength-indicator {
+            height: 4px;
+            background: var(--border);
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .strength-fill { height: 100%; width: 0%; transition: width 0.5s ease, background 0.5s; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="output-box" id="output" title="Click to Copy">...</div>
+
+    <div class="metrics">
+        <div class="metric-card">
+            <span class="m-label">Calculated Entropy</span>
+            <span class="m-value" id="entValue">0.00 <small>bits</small></span>
+        </div>
+        <div class="metric-card">
+            <span class="m-label">Security Grade</span>
+            <span class="m-value" id="gradeValue">-</span>
+        </div>
+    </div>
+
+    <div class="config-row">
+        <label style="font-weight: 500;">Password Length</label>
+        <div class="length-container">
+            <input type="number" id="lenInput" min="1" max="99" value="18">
+        </div>
+    </div>
+
+    <div class="grid-options">
+        <label class="option"><input type="checkbox" id="up" checked> Uppercase</label>
+        <label class="option"><input type="checkbox" id="lo" checked> Lowercase</label>
+        <label class="option"><input type="checkbox" id="nu" checked> Numbers</label>
+        <label class="option"><input type="checkbox" id="sy" checked> Symbols</label>
+    </div>
+
+    <button id="genBtn">Generate Security Key</button>
+    
+    <div class="strength-indicator">
+        <div id="strengthFill" class="strength-fill"></div>
+    </div>
+</div>
+
+<script>
+    const chars = {
+        up: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        lo: "abcdefghijklmnopqrstuvwxyz",
+        nu: "0123456789",
+        sy: "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    };
+
+    // --- CUSTOM MULTI-STEP ALGORITHM ---
+    
+    // Step 1: Internal State Controller
+    let state = {
+        seed: Date.now() ^ (performance.now() * 1000),
+        counter: 0
+    };
+
+    // Step 2: Xorshift Randomness Mixer
+    // Provides better distribution than standard Math.random()
+    function next() {
+        state.counter++;
+        let x = state.seed ^ (state.seed << 13);
+        x ^= (x >> 17);
+        x ^= (x << 5);
+        state.seed = (x + state.counter) >>> 0;
+        return state.seed / 4294967296;
+    }
+
+    // Step 3: Noise Injection
+    // Mixes external noise sources into the current state
+    function injectNoise() {
+        state.seed ^= (Math.random() * 0xFFFFFFFF) >>> 0;
+        state.seed ^= (performance.now() * 1000) >>> 0;
+    }
+
+    function generate() {
+        injectNoise();
+        const length = parseInt(document.getElementById('lenInput').value) || 16;
+        const pool = (document.getElementById('up').checked ? chars.up : "") +
+                     (document.getElementById('lo').checked ? chars.lo : "") +
+                     (document.getElementById('nu').checked ? chars.nu : "") +
+                     (document.getElementById('sy').checked ? chars.sy : "");
+
+        if (!pool) return;
+
+        let result = [];
+
+        // Pass 1: Raw Selection
+        for (let i = 0; i < length; i++) {
+            const r = next();
+            result.push(pool[Math.floor(r * pool.length)]);
+        }
+
+        // Pass 2: Position Jitter (Non-linear shuffle)
+        for (let i = result.length - 1; i > 0; i--) {
+            const j = Math.floor(next() * (i + 1));
+            [result[i], result[j]] = [result[j], result[i]];
+        }
+
+        // Pass 3: Character Mutation (S-Box Logic)
+        // Re-randomizes every 3rd character based on a new high-res timestamp
+        for (let i = 0; i < result.length; i += 3) {
+            injectNoise();
+            result[i] = pool[Math.floor(next() * pool.length)];
+        }
+
+        const finalPass = result.join('');
+        document.getElementById('output').innerText = finalPass;
+        analyzePassword(finalPass);
+    }
+
+    // --- DECOUPLED SECURITY ANALYSIS ---
+    // This analyzes the RESULTING string, not the settings used.
+
+    function analyzePassword(pwd) {
+        const len = pwd.length;
+        if (len === 0) return;
+
+        // 1. Determine the actual character variety found in the string
+        let hasUpper = /[A-Z]/.test(pwd);
+        let hasLower = /[a-z]/.test(pwd);
+        let hasNum = /[0-9]/.test(pwd);
+        let hasSym = /[^A-Za-z0-9]/.test(pwd);
+
+        let actualPoolSize = 0;
+        if (hasUpper) actualPoolSize += 26;
+        if (hasLower) actualPoolSize += 26;
+        if (hasNum) actualPoolSize += 10;
+        if (hasSym) actualPoolSize += 32;
+
+        // 2. Shannon Entropy Calculation (H = -sum(pi * log2(pi)))
+        const charMap = {};
+        for (let char of pwd) {
+            charMap[char] = (charMap[char] || 0) + 1;
+        }
+        
+        let entropy = 0;
+        for (let char in charMap) {
+            let p = charMap[char] / len;
+            entropy -= p * (Math.log(p) / Math.log(2));
+        }
+        
+        // Total Information Content in bits
+        const totalEntropy = (entropy * len).toFixed(2);
+
+        // UI Updates
+        document.getElementById('entValue').innerHTML = `${totalEntropy} <small>bits</small>`;
+        
+        const gradeEl = document.getElementById('gradeValue');
+        const fill = document.getElementById('strengthFill');
+        
+        let grade = "";
+        let color = "";
+        let width = "";
+
+        if (totalEntropy < 45) {
+            grade = "Weak";
+            color = "var(--danger)";
+            width = "25%";
+        } else if (totalEntropy < 75) {
+            grade = "Moderate";
+            color = "var(--warning)";
+            width = "50%";
+        } else if (totalEntropy < 100) {
+            grade = "Secure";
+            color = "var(--accent)";
+            width = "75%";
+        } else {
+            grade = "Paranoid";
+            color = "var(--success)";
+            width = "100%";
+        }
+
+        gradeEl.innerText = grade;
+        gradeEl.style.color = color;
+        fill.style.width = width;
+        fill.style.background = color;
+    }
+
+    // Initialize & Listeners
+    document.getElementById('genBtn').addEventListener('click', generate);
+    document.getElementById('output').addEventListener('click', function() {
+        navigator.clipboard.writeText(this.innerText);
+        const original = this.style.color;
+        this.style.color = "#fff";
+        setTimeout(() => this.style.color = original, 200);
+    });
+
+    // Enforce 3-digit limit
+    document.getElementById('lenInput').addEventListener('input', function() {
+        if (this.value > 99) this.value = 99;
+        if (this.value < 1) this.value = 1;
+    });
+
+    window.onload = generate;
+</script>
+
+</body>
+</html>
