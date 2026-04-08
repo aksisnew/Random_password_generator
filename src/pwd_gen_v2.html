@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi step Generator</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --panel: #111111;
+            --accent: #00f2ff;
+            --text: #e0e0e0;
+            --border: #222222;
+            --danger: #ff2e63;
+            --success: #08f7af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Monaco', 'Consolas', monospace; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .core {
+            background: var(--panel);
+            padding: 40px;
+            border-radius: 4px;
+            width: 100%;
+            max-width: 550px;
+            border: 1px solid var(--border);
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        .output-zone {
+            background: #000;
+            padding: 20px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 1.4rem;
+            text-align: center;
+            word-break: break-all;
+            margin-bottom: 30px;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.1);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .m-box {
+            border: 1px solid var(--border);
+            padding: 15px;
+            background: #0a0a0a;
+        }
+
+        .m-lbl { font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .m-val { font-size: 1.1rem; font-weight: bold; }
+
+        .ctrl-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        input[type="number"] {
+            background: #000;
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 10px;
+            width: 80px;
+            font-size: 1.2rem;
+            outline: none;
+            text-align: center;
+        }
+
+        .opt-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .opt-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid var(--border);
+            transition: 0.2s;
+        }
+
+        .opt-btn:hover { border-color: #444; }
+        .opt-btn input { accent-color: var(--accent); }
+
+        button#exec {
+            width: 100%;
+            padding: 20px;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: 0.3s;
+        }
+
+        button#exec:hover { background: var(--accent); color: #000; }
+
+        .gauge-wrap {
+            height: 2px;
+            background: #111;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .gauge-fill { height: 100%; width: 0%; transition: 0.5s width; }
+    </style>
+</head>
+<body>
+
+<div class="core">
+    <div class="output-zone" id="out">INIT_READY</div>
+
+    <div class="metrics-grid">
+        <div class="m-box">
+            <span class="m-lbl">Shannon Entropy</span>
+            <span class="m-val" id="ent_v">0.00</span>
+        </div>
+        <div class="m-box">
+            <span class="m-lbl">Bit-Security</span>
+            <span class="m-val" id="sec_v">0.00</span>
+        </div>
+    </div>
+
+    <div class="ctrl-row">
+        <span>KEY_LENGTH</span>
+        <input type="number" id="len" value="32" min="1" max="999">
+    </div>
+
+    <div class="opt-grid">
+        <label class="opt-btn"><input type="checkbox" id="c1" checked>  _UPPER</label>
+        <label class="opt-btn"><input type="checkbox" id="c2" checked>  _LOWER</label>
+        <label class="opt-btn"><input type="checkbox" id="c3" checked> NUMERIC</label>
+        <label class="opt-btn"><input type="checkbox" id="c4" checked> SYMBOLS</label>
+    </div>
+
+    <button id="exec">Execute Algorithm</button>
+    <div class="gauge-wrap"><div id="gauge" class="gauge-fill"></div></div>
+</div>
+
+<script>
+    (function() {
+        const _C = {
+            c1: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            c2: "abcdefghijklmnopqrstuvwxyz",
+            c3: "0123456789",
+            c4: "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        };
+
+        let _S = { x: 123456789, y: 362436069, z: 521288629, w: 88675123 };
+
+        function _seed() {
+            let t = Date.now() ^ (performance.now() * 1000);
+            _S.x = (t ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
+            _S.y = (Math.random() * 0xFFFFFFFF) >>> 0;
+            _S.z = (performance.now() * 1000) >>> 0;
+            _S.w = (_S.x ^ _S.z) >>> 0;
+        }
+
+        function _xor128() {
+            let t = _S.x ^ (_S.x << 11);
+            _S.x = _S.y; _S.y = _S.z; _S.z = _S.w;
+            _S.w = (_S.w ^ (_S.w >>> 19)) ^ (t ^ (t >>> 8));
+            return (_S.w >>> 0) / 4294967296;
+        }
+
+        function _pick(p) {
+            return p[Math.floor(_xor128() * p.length)];
+        }
+
+        function _gen_stream(l, p) {
+            let s = "";
+            for(let i=0; i<l; i++) s += _pick(p);
+            return s;
+        }
+
+        function _analyze(str) {
+            const l = str.length;
+            const freq = {};
+            for (let c of str) freq[c] = (freq[c] || 0) + 1;
+            
+            let ent = 0;
+            for (let k in freq) {
+                let p = freq[k] / l;
+                ent -= p * (Math.log(p) / Math.log(2));
+            }
+
+            const total_ent = (ent * l).toFixed(2);
+            document.getElementById('ent_v').innerText = ent.toFixed(3);
+            document.getElementById('sec_v').innerText = total_ent + " bits";
+
+            const g = document.getElementById('gauge');
+            const perc = Math.min(100, (total_ent / 128) * 100);
+            g.style.width = perc + "%";
+            g.style.background = total_ent < 60 ? 'var(--danger)' : total_ent < 100 ? 'orange' : 'var(--success)';
+        }
+
+        function _run() {
+            _seed();
+            const L = parseInt(document.getElementById('len').value) || 1;
+            let P = "";
+            if(document.getElementById('c1').checked) P += _C.c1;
+            if(document.getElementById('c2').checked) P += _C.c2;
+            if(document.getElementById('c3').checked) P += _C.c3;
+            if(document.getElementById('c4').checked) P += _C.c4;
+            if(!P) return;
+
+            const s1 = _gen_stream(L, P);
+            const s2 = _gen_stream(L, P);
+            const s3 = _gen_stream(L, P);
+            const s4 = _gen_stream(L, P);
+
+            let res = "";
+            for(let i=0; i<L; i++) {
+                const r = _xor128();
+                if(r < 0.25) {
+                    res += s1[i];
+                } else if (r < 0.50) {
+                    const char_s2 = s2[i];
+                    const char_s3 = s3[i];
+                    res += (char_s2.charCodeAt(0) ^ char_s3.charCodeAt(0)) % 2 === 0 ? char_s2 : char_s3;
+                } else if (r < 0.75) {
+                    res += s4[i];
+                } else {
+                    const mix = [s1[i], s2[i], s3[i], s4[i]];
+                    res += mix[Math.floor(_xor128() * 4)];
+                }
+            }
+
+            const arr = res.split('');
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(_xor128() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+
+            const final = arr.join('');
+            document.getElementById('out').innerText = final;
+            _analyze(final);
+        }
+
+        document.getElementById('exec').addEventListener('click', _run);
+        document.getElementById('len').addEventListener('input', function() {
+            if(this.value > 999) this.value = 999;
+        });
+        _run();
+    })();
+</script>
+</body>
+</html>
